@@ -1,22 +1,12 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import Property from '../models/Property.js';
+import { cloudinary, storage } from '../config/cloudinary.js';
 
 const router = express.Router();
 
-const uploadDir = 'uploads/properties';
-if(!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random()*1e9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-
+// ☁️ CLOUDINARY STORAGE - Render pe pics kabhi gayab nahi honge
+// Pehle wala diskStorage hata diya, baaki sab SAME he
 const upload = multer({ 
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }
@@ -43,7 +33,7 @@ router.get('/:plotNo', async (req, res) => {
   }
 });
 
-// POST - 10 PICS + 3 LEGAL MAPS - FINAL FIX
+// POST - 10 PICS + 3 LEGAL MAPS - FINAL FIX + CLOUDINARY
 router.post('/', upload.fields([
   { name: 'propertyImages', maxCount: 10 },
   { name: 'kdaMap', maxCount: 1 },
@@ -58,12 +48,12 @@ router.post('/', upload.fields([
 
     if(!plotNo || !title) return res.status(400).json({ error: 'Plot No or Title missing' });
 
-    // 1. Property Images - 10 Pics
+    // 1. Property Images - 10 Pics - CLOUDINARY URL
     let images = [];
     if(req.files['propertyImages']){
       images = req.files['propertyImages'].map((file, index) => ({
-        url: `http://localhost:5000/${file.path.replace(/\\/g, '/')}`,
-        publicId: file.filename,
+        url: file.path, // Cloudinary URL - pehle localhost wala tha
+        publicId: file.filename, // Cloudinary public_id - delete ke kaam ayega
         caption: index === 0 ? 'Main Image' : `Image ${index+1}`,
         isMain: index === 0,
         order: index
@@ -71,11 +61,11 @@ router.post('/', upload.fields([
     }
     const mainImage = images.length > 0 ? images[0].url : '';
 
-    // 2. Legal Maps Images
+    // 2. Legal Maps Images - CLOUDINARY URL
     const getFileUrl = (fieldName) => {
       if(req.files[fieldName] && req.files[fieldName][0]){
         const file = req.files[fieldName][0];
-        return `http://localhost:5000/${file.path.replace(/\\/g, '/')}`;
+        return file.path; // Cloudinary URL
       }
       return '';
     };
@@ -127,7 +117,7 @@ router.post('/', upload.fields([
     });
 
     await property.save();
-    console.log('Saved:', property.plotNo, 'with', images.length, 'pics + legalMaps');
+    console.log('Saved:', property.plotNo, 'with', images.length, 'pics + legalMaps - CLOUDINARY');
     res.status(201).json({ success: true, property });
 
   } catch(err){
@@ -136,9 +126,20 @@ router.post('/', upload.fields([
   }
 });
 
-// DELETE
+// DELETE - Cloudinary se bhi delete
 router.delete('/:id', async (req, res) => {
   try {
+    const prop = await Property.findById(req.params.id);
+    if(prop){
+      // Cloudinary se pics delete - taake storage full na ho
+      for(let img of (prop.images || [])){
+        if(img.publicId){
+          try{ await cloudinary.uploader.destroy(img.publicId); }catch(e){}
+        }
+      }
+      // Legal maps bhi delete (agar publicId he to)
+      // Legal maps ke liye publicId save nahi tha, isliye sirf DB se delete
+    }
     await Property.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch(err){
