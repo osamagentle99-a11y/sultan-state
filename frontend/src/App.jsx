@@ -11,7 +11,7 @@ export default function App(){
   const [currentImg, setCurrentImg] = useState(0);
 
   useEffect(()=>{
-    fetch('http://localhost:5000/api/properties')
+    fetch('http://sultan-backend-8bqa.onrender.com/api/properties')
       .then(r=>r.json())
       .then(d=>setProperties(d.properties || []))
       .catch(()=>setProperties([]));

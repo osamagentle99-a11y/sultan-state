@@ -21,7 +21,7 @@ export default function Admin({ onBack }) {
   const [surveyFile, setSurveyFile] = useState(null);
 
   useEffect(()=>{
-    fetch('http://localhost:5000/api/properties')
+    fetch('http://sultan-backend-8bqa.onrender.com/api/properties')
       .then(r=>r.json())
       .then(d=>setProperties(d.properties || []))
       .catch(()=>{});
@@ -44,7 +44,7 @@ export default function Admin({ onBack }) {
 
   const handleDelete = async (id) => {
     if(!confirm('Delete karni he?')) return;
-    await fetch(`http://localhost:5000/api/properties/${id}`, { method: 'DELETE' });
+    await fetch(`http://sultan-backend-8bqa.onrender.com/api/properties/${id}`, { method: 'DELETE' });
     setMsg('🗑️ Deleted');
   };
   
@@ -64,7 +64,7 @@ export default function Admin({ onBack }) {
       if(sbcaFile) data.append('sbcaNocDoc', sbcaFile);
       if(surveyFile) data.append('surveyMap', surveyFile);
       
-      const res = await fetch('http://localhost:5000/api/properties', { method: 'POST', body: data });
+      const res = await fetch('http://sultan-backend-8bqa.onrender.com/api/properties', { method: 'POST', body: data });
       const result = await res.json();
       
       if(res.ok){
